@@ -2,36 +2,37 @@
 [![Version](https://img.shields.io/pub/v/masked_text_formatter.svg)](https://pub.dartlang.org/packages/masked_text_formatter)
 ![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)
 
-## [English](README_EN.md) | 中文
+## English | [中文](README.md)
 
-本库提供了一个TextInputFormatter用于TextField或者TextFormField，按照给定的格式进行格式化，或者按照给定的格式将格式化字符串设置到Text。
+This package provides TextInputFormatter for TextField/TextFormField widget which format the input
+by a given mask.Or provides the formatted string for Text widget which format the text by a given mask.
 
-## 快照
+## Snapshot
 
 ![](snapshot/android.gif)
 ![](snapshot/ios.gif)
 
-## 引入
-添加如下到你的pubspec.yaml文件:
+## Installation
+Add this to your package's pubspec.yaml file:
 ```
 dependencies:
   masked_text_formatter: ^0.0.1
 ```
-## 如何使用
-### 导入
+## How to use
+### Import it
 ```dart
 import 'package:masked_text_formatter/masked_text_formatter.dart';
 ```
-### 创建
+### Create
 ```dart
-//Simple格式化
+//Simple
 var maskedFormatter = new MaskedTextFormatter.simple("344");
-//Complex格式化
+//Complex
 var maskedFormatter = new MaskedTextFormatter.complex("😊😊😊****😊😊😊", mark: "*",
                                         deleteEndPlaceholder: false)
-//Mask格式化
+//Mask
 var maskedFormatter = new MaskedTextFormatter.mask("000 0000 0000", emptyPlaceholder: "_");
-//Custom格式化
+//Custom
 var maskedFormatter = new MaskedTextFormatter.custom("000 000 0000 0000 000X",
                                         emptyPlaceholder: "_",
                                         filterRules: {
@@ -39,12 +40,12 @@ var maskedFormatter = new MaskedTextFormatter.custom("000 000 0000 0000 000X",
                                           "0": RegExpMatcher.from(r'[0-9]')
                                         });
 ```
-### 方法定义
+### Methods
 |Name|Params|Desc|
-|---|:---:|:---:|
-|formatMask|String|格式化文本(可以用来设置到Text)|
-|clear|Void|清除已格式化的字符串|
-|getRealText|Void|获取真实的字符串|
+|:---:|:---:|:---:|
+|formatMask|String|Provides the formatted string(Can be used to set the text of Text widget)|
+|clear|Void|Clear the formartted string|
+|getRealText|Void|Get unmasked text|
 
 ### License
 MIT License

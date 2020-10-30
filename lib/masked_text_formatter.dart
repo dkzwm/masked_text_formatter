@@ -1,134 +1,126 @@
 import 'dart:math';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 /// author:dkzwm
 /// Used dart to write a flutter version about [FormatEditText](https://github.com/dkzwm/FormatEditText)
 class MaskedTextFormatter extends TextInputFormatter {
-  _SpanText _spanText;
+  SpanText _spanText;
 
-  MaskedTextFormatter.simple({
-    String formatStyle,
+  MaskedTextFormatter.simple(
+    String formatStyle, {
     String placeholder,
+    bool matchLength = true,
+    bool deleteEndPlaceholder = true,
   }) {
-    if (_SpanText.isEmpty(formatStyle)) {
+    if (SpanText.isEmpty(formatStyle)) {
       throw ArgumentError.value(
           formatStyle, "formatStyle", "Must have character");
     }
-    for (int i = 0; i < formatStyle.length; i++) {
-      if (!_SpanText.isDigit(formatStyle.codeUnitAt(i))) {
+    final iterator = formatStyle.runes.iterator;
+    while (iterator.moveNext()) {
+      if (!SpanText.isDigit(iterator.currentAsString)) {
         throw ArgumentError.value(formatStyle, "formatStyle", "Must be digit");
       }
     }
-    if (placeholder != null && placeholder.length > 1) {
+    iterator.reset();
+    if (placeholder != null && placeholder.runes.length > 1) {
       throw ArgumentError.value(
           placeholder, "placeholder", "Must be null or length one character");
     }
-    placeholder =
-        placeholder ?? String.fromCharCode(_SpanText._sDefaultPlaceHolder);
+    placeholder = placeholder ?? SpanText._sDefaultPlaceHolder;
     final StringBuffer buffer = StringBuffer();
-    for (int i = 0; i < formatStyle.length; i++) {
-      int count = int.parse(formatStyle.substring(i, i + 1), radix: 10);
+    iterator.moveNext();
+    while (iterator.current != -1) {
+      int count = int.parse(iterator.currentAsString, radix: 10);
       while (count > 0) {
-        buffer.write(String.fromCharCode(_SpanText._sDigitMask));
+        buffer.write(SpanText._sDigitMask);
         count -= 1;
       }
-      if (i != formatStyle.length - 1) {
+      if (iterator.moveNext()) {
         buffer.write(placeholder);
       }
     }
-    _spanText = _SpanText._(
-        formatStyle: buffer.toString(),
-        indexes: null,
-        emptyPlaceholder: _SpanText._sDefaultEmptyPlaceholder,
-        emptyPlaceholderString: null,
-        filters: null,
-        escapeMark: _SpanText._sEscapeMark);
+    _spanText = SpanText._(buffer.toString().runes.iterator,
+        matchLength: matchLength, deleteEndPlaceholder: deleteEndPlaceholder);
   }
 
-  MaskedTextFormatter.complex({
-    String formatStyle,
+  MaskedTextFormatter.complex(
+    String formatStyle, {
     String mark,
+    bool matchLength = true,
+    bool deleteEndPlaceholder = true,
   }) {
-    if (_SpanText.isEmpty(formatStyle)) {
+    if (SpanText.isEmpty(formatStyle)) {
       throw ArgumentError.value(
           formatStyle, "formatStyle", "Must have character");
     }
-    if (mark != null && mark.length > 1) {
+    if (mark != null && mark.runes.length > 1) {
       throw ArgumentError.value(
           mark, "mark", "Must be null or length one character");
     }
-    mark = mark ?? String.fromCharCode(_SpanText._sDefaultMark);
+    mark = mark ?? SpanText._sDefaultMark;
     if (!formatStyle.contains(mark)) {
       throw ArgumentError.value(
           formatStyle, "formatStyle", "Must have mark:'$mark' character");
     }
     final StringBuffer buffer = StringBuffer();
     List<int> indexes = [];
-    for (int i = 0; i < formatStyle.length; i++) {
-      String sub = formatStyle.substring(i, i + 1);
-      int subCode = sub.codeUnitAt(0);
-      if (sub == mark) {
-        buffer.write(String.fromCharCode(_SpanText._sDigitMask));
-      } else if (subCode == _SpanText._sDigitOrLetterMask ||
-          subCode == _SpanText._sDigitMask ||
-          subCode == _SpanText._sLetterMask ||
-          subCode == _SpanText._sEscapeMark) {
-        indexes.add(buffer.length);
-        buffer.write(String.fromCharCode(_SpanText._sEscapeMark));
-        buffer.write(sub);
+    final iterator = formatStyle.runes.iterator;
+    var index = 0;
+    while (iterator.moveNext()) {
+      final next = iterator.currentAsString;
+      if (next == mark) {
+        buffer.write(SpanText._sDigitMask);
+        index += 1;
+      } else if (next == SpanText._sDigitOrLetterMask ||
+          next == SpanText._sDigitMask ||
+          next == SpanText._sLetterMask ||
+          next == SpanText._sEscapeMark) {
+        indexes.add(index);
+        index += 2;
+        buffer.write(SpanText._sEscapeMark);
+        buffer.write(next);
       } else {
-        buffer.write(sub);
+        buffer.write(next);
+        index += 1;
       }
     }
-    _spanText = _SpanText._(
-        formatStyle: buffer.toString(),
-        indexes: indexes,
-        emptyPlaceholder: _SpanText._sDefaultEmptyPlaceholder,
-        emptyPlaceholderString: null,
-        filters: null,
-        escapeMark: _SpanText._sEscapeMark);
+    _spanText = SpanText._(buffer.toString().runes.iterator,
+        matchLength: matchLength, deleteEndPlaceholder: deleteEndPlaceholder);
   }
 
-  MaskedTextFormatter.mask({
-    String formatStyle,
+  MaskedTextFormatter.mask(
+    String formatStyle, {
     String emptyPlaceholder,
+    bool matchLength = true,
+    bool deleteEndPlaceholder = true,
   }) {
-    if (_SpanText.isEmpty(formatStyle)) {
+    if (SpanText.isEmpty(formatStyle)) {
       throw ArgumentError.value(
           formatStyle, "formatStyle", "Must have character");
     }
-    if (emptyPlaceholder != null && emptyPlaceholder.length > 1) {
+    if (emptyPlaceholder != null && emptyPlaceholder.runes.length > 1) {
       throw ArgumentError.value(emptyPlaceholder, "emptyPlaceholder",
           "Must be null or length one character");
     }
-    List<int> indexes = [];
-    bool nextCharIsText = false;
-    for (int i = 0; i < formatStyle.length; i++) {
-      int subCode = formatStyle.substring(i, i + 1).codeUnitAt(0);
-      if (!nextCharIsText && subCode == _SpanText._sEscapeMark) {
-        nextCharIsText = true;
-        indexes.add(i);
-      }
-    }
-    _spanText = _SpanText._(
-        formatStyle: formatStyle,
-        indexes: indexes,
-        emptyPlaceholder: emptyPlaceholder == null
-            ? _SpanText._sDefaultEmptyPlaceholder
-            : emptyPlaceholder.codeUnitAt(0),
-        emptyPlaceholderString: emptyPlaceholder,
-        filters: null,
-        escapeMark: _SpanText._sEscapeMark);
+    _spanText = SpanText._(formatStyle.runes.iterator,
+        emptyPlaceholder: emptyPlaceholder,
+        matchLength: matchLength,
+        deleteEndPlaceholder: deleteEndPlaceholder);
   }
 
-  MaskedTextFormatter.custom({
-    String formatStyle,
+  MaskedTextFormatter.custom(
+    String formatStyle, {
     String emptyPlaceholder,
-    Map<String, RegExp> filterRules,
+    Map<String, Matcher> filterRules,
+    Map<String, Matcher> placeholderRules,
     String escapeMark,
+    bool matchLength = true,
+    bool deleteEndPlaceholder = true,
   }) {
-    if (_SpanText.isEmpty(formatStyle)) {
+    if (SpanText.isEmpty(formatStyle)) {
       throw ArgumentError.value(
           formatStyle, "formatStyle", "Must have character");
     }
@@ -140,37 +132,13 @@ class MaskedTextFormatter extends TextInputFormatter {
       throw ArgumentError.value(
           escapeMark, "escapeMark", "Must be null or length one character");
     }
-    int escapeMarkCode =
-        escapeMark == null ? _SpanText._sEscapeMark : escapeMark.codeUnitAt(0);
-    Map<int, RegExp> filter;
-    if (filterRules != null) {
-      filter = Map();
-      for (final key in filterRules.keys) {
-        if (key.length > 1) {
-          throw ArgumentError.value(
-              key, "The key of filterRules", "Must be length one character");
-        }
-        filter[key.codeUnitAt(0)] = filterRules[key];
-      }
-    }
-    List<int> indexes = [];
-    bool nextCharIsText = false;
-    for (int i = 0; i < formatStyle.length; i++) {
-      int subCode = formatStyle.substring(i, i + 1).codeUnitAt(0);
-      if (!nextCharIsText && subCode == escapeMarkCode) {
-        nextCharIsText = true;
-        indexes.add(i);
-      }
-    }
-    _spanText = _SpanText._(
-        formatStyle: formatStyle,
-        indexes: indexes,
-        emptyPlaceholder: emptyPlaceholder == null
-            ? _SpanText._sDefaultEmptyPlaceholder
-            : emptyPlaceholder.codeUnitAt(0),
-        emptyPlaceholderString: emptyPlaceholder,
-        filters: filter,
-        escapeMark: escapeMarkCode);
+    escapeMark = escapeMark ?? SpanText._sEscapeMark;
+    _spanText = SpanText._(formatStyle.runes.iterator,
+        emptyPlaceholder: emptyPlaceholder,
+        maskFilters: filterRules,
+        escapeMark: escapeMark,
+        matchLength: matchLength,
+        deleteEndPlaceholder: deleteEndPlaceholder);
   }
 
   @override
@@ -202,48 +170,47 @@ class MaskedTextFormatter extends TextInputFormatter {
   }
 }
 
-class _SpanText {
-  static const int _sDefaultEmptyPlaceholder = -1;
-
+class SpanText {
   /// ' '
-  static const int _sDefaultPlaceHolder = 32;
+  static const String _sDefaultPlaceHolder = " ";
 
   /// '*'
-  static const int _sDefaultMark = 42;
+  static const String _sDefaultMark = "*";
 
   /// '0'
-  static const int _sDigitMask = 48;
+  static const String _sDigitMask = "0";
 
   /// 'A'
-  static const int _sLetterMask = 65;
+  static const String _sLetterMask = "A";
 
   /// '*'
-  static const int _sDigitOrLetterMask = 42;
+  static const String _sDigitOrLetterMask = "*";
 
   /// '?'
-  static const int _sCharacterMask = 63;
+  static const String _sCharacterMask = "?";
 
   /// '\'
-  static const int _sEscapeMark = 92;
-  final List<_SingleSpan> _placeholderList = [];
-  final List<_SingleSpan> _tempPlaceholderList = [];
-  final String formatStyle;
-  final int emptyPlaceholder;
-  final String emptyPlaceholderString;
-  final List<int> indexes;
-  final Map<int, RegExp> filters;
-  final int escapeMark;
+  static const String _sEscapeMark = "\\";
+  final List<_SingleSpan> _spanList = [];
+  final List<_SingleSpan> _tempSpanList = [];
+  final StringBuffer _buffer = StringBuffer();
+  final RuneIterator styleRuneIterator;
+  final String emptyPlaceholder;
+  final Map<String, Matcher> maskFilters;
+  final Map<String, PlaceholderConverter> placeholderFilters;
+  final String escapeMark;
+  final bool matchLength;
+  final bool deleteEndPlaceholder;
   String _maskedText;
   String _lastNewText;
 
-  _SpanText._({
-    this.formatStyle,
-    this.indexes,
-    this.emptyPlaceholder,
-    this.emptyPlaceholderString,
-    this.filters,
-    this.escapeMark,
-  });
+  SpanText._(this.styleRuneIterator,
+      {this.emptyPlaceholder = "",
+      this.maskFilters,
+      this.placeholderFilters,
+      this.escapeMark = _sEscapeMark,
+      this.matchLength,
+      this.deleteEndPlaceholder});
 
   _format(TextEditingValue oldValue, TextEditingValue newValue) {
     final String oldText = oldValue.text;
@@ -255,85 +222,80 @@ class _SpanText {
     final int oldSelectionEnd = oldSelection.isValid ? oldSelection.end : 0;
     final int newSelectionStart = newSelection.isValid ? newSelection.start : 0;
     final int newSelectionEnd = newSelection.isValid ? newSelection.end : 0;
-    int realStart = min(oldSelectionStart, newSelectionStart);
-    final int styleLength = formatStyle.length;
-    if (realStart > styleLength) {
-      _maskedText = newValue.text;
-      return newValue;
-    }
+    int start = min(oldSelectionStart, newSelectionStart);
     int selection = 0;
     int lastIndex = 0;
     bool isErasing = false;
-    int placeholderIndex = -1;
-    _tempPlaceholderList.clear();
-    if (_placeholderList.length > 0) {
-      for (int i = _placeholderList.length - 1; i >= 0; i--) {
-        final placeholderSpan = _placeholderList[i];
-        int currentIndex = placeholderSpan.index;
-        if (currentIndex + 1 == realStart) {
-          while (
-              i - 1 >= 0 && _placeholderList[i - 1].index == currentIndex - 1) {
-            currentIndex = _placeholderList[i - 1].index;
+    int spanIndex = -1;
+    _buffer.clear();
+    _tempSpanList.clear();
+    if (_spanList.length > 0) {
+      for (int i = _spanList.length - 1; i >= 0; i--) {
+        final span = _spanList[i];
+        int index = span.index;
+        if (index + span.size == start) {
+          int j = i - 1;
+          while (j >= 0 && _spanList[j].index == index - _spanList[j].size) {
+            index = _spanList[j].index;
             i -= 1;
+            j = i - 1;
             continue;
           }
-          realStart = currentIndex;
-          placeholderIndex = i;
+          start = index;
+          spanIndex = i;
           if (i != 0) {
-            _tempPlaceholderList.addAll(_placeholderList.sublist(0, i));
+            _tempSpanList.addAll(_spanList.getRange(0, i));
           }
           break;
-        } else if (currentIndex + 1 < realStart) {
-          placeholderIndex = i;
-          _tempPlaceholderList.addAll(_placeholderList.sublist(0, i + 1));
+        } else if (index + span.size < start) {
+          spanIndex = i;
+          _tempSpanList.addAll(_spanList.getRange(0, i + 1));
           break;
         } else {
-          placeholderIndex = i;
+          spanIndex = i;
         }
       }
     }
-    final StringBuffer buffer = StringBuffer();
-    if (realStart > 0) {
-      buffer.write(oldText.substring(0, realStart));
+    if (start > 0) {
+      _buffer.write(oldText.substring(0, start));
     }
     if (newSelectionStart > oldSelectionStart) {
       if (oldSelectionStart != newSelectionEnd) {
-        buffer.write(newText.substring(oldSelectionStart, newSelectionEnd));
+        _buffer.write(newText.substring(oldSelectionStart, newSelectionEnd));
       }
     } else {
       isErasing = true;
     }
-    selection = buffer.length;
+    selection = _buffer.length;
     if (oldSelectionEnd < oldText.length) {
-      if (placeholderIndex != -1) {
+      if (spanIndex != -1) {
         lastIndex = oldSelectionEnd;
-        for (int i = placeholderIndex; i < _placeholderList.length; i++) {
-          int currentIndex = _placeholderList[i].index;
-          if (currentIndex > lastIndex) {
-            buffer.write(oldText.substring(lastIndex, currentIndex));
+        for (int i = spanIndex; i < _spanList.length; i++) {
+          int index = _spanList[i].index;
+          if (index > lastIndex) {
+            _buffer.write(oldText.substring(lastIndex, index));
           }
-          lastIndex = max(currentIndex + 1, lastIndex);
+          lastIndex = max(index + _spanList[i].size, lastIndex);
         }
-        buffer.write(oldText.substring(lastIndex));
+        _buffer.write(oldText.substring(lastIndex));
       } else {
-        buffer.write(oldText.substring(oldSelectionEnd));
+        _buffer.write(oldText.substring(oldSelectionEnd));
       }
     }
-    final String needFormatText = buffer.toString();
-    buffer.clear();
-    if (isErasing && needFormatText.isEmpty) {
-      _placeholderList.clear();
-      _maskedText = needFormatText;
+    final String text = _buffer.toString();
+    _buffer.clear();
+    if (isErasing && text.isEmpty) {
+      _spanList.clear();
+      _maskedText = text;
       return TextEditingValue(
-          text: needFormatText,
+          text: text,
           selection: newValue.selection
               .copyWith(baseOffset: selection, extentOffset: selection));
     }
-    buffer.write(needFormatText.substring(0, realStart));
-    final preSelectionSpanCount =
-        _formatMask(buffer, needFormatText, realStart, selection);
-    _maskedText = buffer.toString();
-    int offset = min(selection + preSelectionSpanCount, _maskedText.length);
+    _buffer.write(text.substring(0, start));
+    final diffSelection = _formatMask(_buffer, text, start, selection);
+    _maskedText = _buffer.toString();
+    int offset = min(selection + diffSelection, _maskedText.length);
     return TextEditingValue(
         text: _maskedText,
         selection: newValue.selection
@@ -341,96 +303,111 @@ class _SpanText {
   }
 
   int _formatMask(StringBuffer buffer, String text, int start, int selection) {
-    final int styleLength = formatStyle.length;
-    int newValueLength = text.length;
-    int indexInStyle = start + _rangeCountEscapeChar(start);
-    int indexInText = start;
-    int preSelectionSpanCount = 0;
-    int lastRealTextCharLength = 0;
-    int lastRealTextCharPlaceholderIndex = -1;
-    bool nextCharIsText = false;
+    final bufferLength = buffer.length;
+    final textRuneIterator = text.runes.iterator;
+    int diffSelection = 0;
+    int preMaskedLength = bufferLength;
+    int preSpanIndex = _tempSpanList.length;
+    bool nextTextIsText = false;
     bool emptyPlaceholderAdded = false;
-    while (indexInStyle < styleLength) {
-      int charInStyle = formatStyle.codeUnitAt(indexInStyle);
-      if (!nextCharIsText && _isMaskChar(charInStyle)) {
-        if (indexInText >= newValueLength) {
-          if (emptyPlaceholder != _sDefaultEmptyPlaceholder) {
+    textRuneIterator.reset(0);
+    textRuneIterator.moveNext();
+    styleRuneIterator.reset(0);
+    styleRuneIterator.moveNext();
+    int index = start;
+    int current = 0;
+    while (styleRuneIterator.current != -1) {
+      String textInStyle = styleRuneIterator.currentAsString;
+      if (current < bufferLength) {
+        if (!nextTextIsText && textInStyle == escapeMark) {
+          nextTextIsText = true;
+          styleRuneIterator.moveNext();
+        } else {
+          nextTextIsText = false;
+          current += textRuneIterator.currentSize;
+          textRuneIterator.moveNext();
+          styleRuneIterator.moveNext();
+        }
+        continue;
+      }
+      if (!nextTextIsText && _isMaskChar(textInStyle)) {
+        if (textRuneIterator.current == -1) {
+          final int length = emptyPlaceholder?.length ?? 0;
+          if (length > 0) {
             emptyPlaceholderAdded = true;
-            buffer.write(emptyPlaceholderString);
-            _tempPlaceholderList.add(_SingleSpan(
-                text: emptyPlaceholderString,
-                index: buffer.length - 1,
-                isEmptyPlaceholder: true));
-            indexInText += 1;
-            indexInStyle += 1;
+            buffer.write(emptyPlaceholder);
+            _tempSpanList.add(
+                _SingleSpan(emptyPlaceholder, index, length, isEmpty: true));
+            index += length;
+            styleRuneIterator.moveNext();
           } else {
             break;
           }
-        } else if (_isMismatchMask(charInStyle, text.codeUnitAt(indexInText))) {
-          if (selection > indexInText) {
-            preSelectionSpanCount -= 1;
+        } else if (_isMismatchMask(
+            textInStyle, buffer.toString(), textRuneIterator.currentAsString)) {
+          if (selection > start) {
+            diffSelection -= textRuneIterator.currentSize;
           }
-          indexInText += 1;
-          continue;
+          start += textRuneIterator.currentSize;
+          textRuneIterator.moveNext();
         } else {
-          buffer.write(text.substring(indexInText, indexInText + 1));
-          lastRealTextCharLength = buffer.length;
-          lastRealTextCharPlaceholderIndex = _tempPlaceholderList.length;
-          indexInText += 1;
-          indexInStyle += 1;
+          buffer.write(textRuneIterator.currentAsString);
+          preMaskedLength = buffer.length;
+          preSpanIndex = _tempSpanList.length;
+          start += textRuneIterator.currentSize;
+          index += styleRuneIterator.currentSize;
+          textRuneIterator.moveNext();
+          styleRuneIterator.moveNext();
         }
-      } else if (!nextCharIsText && charInStyle == escapeMark) {
-        nextCharIsText = true;
-        indexInStyle += 1;
+      } else if (!nextTextIsText && textInStyle == escapeMark) {
+        nextTextIsText = true;
+        styleRuneIterator.moveNext();
       } else {
-        if (selection > indexInText) {
-          preSelectionSpanCount += 1;
+        int size = styleRuneIterator.currentSize;
+        if (placeholderFilters != null &&
+            placeholderFilters.containsKey(textInStyle)) {
+          textInStyle = placeholderFilters[textInStyle]
+              .convert(buffer.toString(), textInStyle);
+          if (textInStyle == null || textInStyle.runes.length != 1) {
+            throw UnsupportedError(
+                "the converted must be length one character");
+          }
+          size = textInStyle.length;
         }
-        buffer.write(String.fromCharCode(charInStyle));
-        _tempPlaceholderList.add(_SingleSpan(
-            text: String.fromCharCode(charInStyle),
-            index: buffer.length - 1,
-            isEmptyPlaceholder: false));
-        nextCharIsText = false;
-        indexInStyle += 1;
+        nextTextIsText = false;
+        if (selection > start) {
+          diffSelection += size;
+        }
+        buffer.write(textInStyle);
+        _tempSpanList.add(_SingleSpan(textInStyle, index, size));
+        index += size;
+        styleRuneIterator.moveNext();
       }
     }
-    if (indexInText < newValueLength) {
-      buffer.write(text.substring(indexInText, newValueLength));
-    } else if (!emptyPlaceholderAdded &&
-        lastRealTextCharPlaceholderIndex != -1) {
-      final String text = buffer.toString();
+    _spanList.clear();
+    if (!matchLength && start < text.length) {
+      buffer.write(text.substring(start, text.length));
+      _spanList.addAll(_tempSpanList);
+    } else if (deleteEndPlaceholder &&
+        !emptyPlaceholderAdded &&
+        preSpanIndex > 0) {
+      final String masked = buffer.toString();
       buffer.clear();
-      buffer.write(text.substring(0, lastRealTextCharLength));
-      _tempPlaceholderList.removeRange(
-          lastRealTextCharPlaceholderIndex, _tempPlaceholderList.length);
-    } else if (emptyPlaceholderAdded &&
-        _tempPlaceholderList.length == buffer.length) {
+      buffer.write(masked.substring(0, preMaskedLength));
+      _tempSpanList.removeRange(preSpanIndex, _tempSpanList.length);
+      _spanList.addAll(_tempSpanList);
+    } else if (_tempSpanList.length == buffer.length) {
       buffer.clear();
-      _tempPlaceholderList.clear();
+      _tempSpanList.clear();
+    } else {
+      _spanList.addAll(_tempSpanList);
     }
-    _placeholderList.clear();
-    _placeholderList.addAll(_tempPlaceholderList);
-    return preSelectionSpanCount;
-  }
-
-  int _rangeCountEscapeChar(int end) {
-    if (indexes == null || indexes.length == 0) {
-      return 0;
-    }
-    int count = 0;
-    for (final int escapeIndex in indexes) {
-      if (escapeIndex < end) {
-        count += 1;
-      } else {
-        break;
-      }
-    }
-    return count;
+    return diffSelection;
   }
 
   void _clear() {
-    _placeholderList.clear();
+    _spanList.clear();
+    _tempSpanList.clear();
     _maskedText = null;
   }
 
@@ -438,17 +415,17 @@ class _SpanText {
     if (isEmpty(_maskedText)) {
       return "";
     }
-    if (_placeholderList.length == 0) {
+    if (_spanList.length == 0) {
       return _maskedText;
     }
     final StringBuffer buffer = StringBuffer();
     int lastIndex = 0;
-    for (final span in _placeholderList) {
+    for (final span in _spanList) {
       int currentIndex = span.index;
       if (currentIndex > lastIndex) {
         buffer.write(_maskedText.substring(lastIndex, currentIndex));
       }
-      lastIndex = currentIndex + 1;
+      lastIndex = currentIndex + span.size;
     }
     if (lastIndex < _maskedText.length) {
       buffer.write(_maskedText.substring(lastIndex));
@@ -456,10 +433,10 @@ class _SpanText {
     return buffer.toString();
   }
 
-  bool _isMismatchMask(int mask, int value) {
-    if (filters != null) {
-      if (filters.containsKey(mask)) {
-        return !filters[mask].hasMatch(String.fromCharCode(value));
+  bool _isMismatchMask(String mask, String previousText, String value) {
+    if (maskFilters != null) {
+      if (maskFilters.containsKey(mask)) {
+        return !maskFilters[mask].hasMatch(previousText, value);
       }
       return false;
     }
@@ -469,9 +446,9 @@ class _SpanText {
         (mask != _sDigitOrLetterMask || (!isDigit(value) && !isLetter(value)));
   }
 
-  bool _isMaskChar(int mask) {
-    if (filters != null) {
-      return filters.containsKey(mask);
+  bool _isMaskChar(String mask) {
+    if (maskFilters != null) {
+      return maskFilters.containsKey(mask);
     }
     return mask == _sDigitMask ||
         mask == _sLetterMask ||
@@ -483,28 +460,63 @@ class _SpanText {
     return str == null || str.isEmpty;
   }
 
-  static bool isDigit(int c) {
-    return c >= 0x30 && c <= 0x39;
+  static bool isDigit(String c) {
+    if (c.length > 1) {
+      return false;
+    }
+    final int code = c.codeUnitAt(0);
+    return code >= 0x30 && code <= 0x39;
   }
 
-  static bool isLetter(int c) {
-    return (c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A);
+  static bool isLetter(String c) {
+    if (c.length > 1) {
+      return false;
+    }
+    final int code = c.codeUnitAt(0);
+    return (code >= 0x41 && code <= 0x5A) || (code >= 0x61 && code <= 0x7A);
   }
 }
 
 class _SingleSpan {
   final String text;
   final int index;
-  final bool isEmptyPlaceholder;
+  final int size;
+  final bool isEmpty;
 
-  _SingleSpan({
+  _SingleSpan(
     this.text,
     this.index,
-    this.isEmptyPlaceholder,
+    this.size, {
+    this.isEmpty = false,
   });
 
   @override
   String toString() {
-    return '_SingleSpan{text: $text, index: $index, isEmptyPlaceholder: $isEmptyPlaceholder}';
+    return '_SingleSpan{text: $text, index: $index, size: $size, isEmpty: $isEmpty}';
+  }
+}
+
+abstract class Matcher {
+  bool hasMatch(String previousText, String value);
+}
+
+abstract class PlaceholderConverter {
+  String convert(String previousText, String value);
+}
+
+class RegExpMatcher extends Matcher {
+  RegExp _regExp;
+
+  RegExpMatcher(RegExp regExp) {
+    this._regExp = regExp;
+  }
+
+  RegExpMatcher.from(String reg) {
+    this._regExp = RegExp(reg);
+  }
+
+  @override
+  bool hasMatch(String previousText, String value) {
+    return _regExp?.hasMatch(value) ?? false;
   }
 }

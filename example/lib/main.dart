@@ -1,3 +1,4 @@
+import 'package:date_util/date_util.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:masked_text_formatter/masked_text_formatter.dart';
@@ -56,34 +57,54 @@ class _Demo {
 }
 
 class _MainPageState extends State<MainPage> {
-  final List<_Demo> demos = [
-    _Demo(
-        formatter: MaskedTextFormatter.simple(formatStyle: "344"),
-        hint: "130 1234 5678",
-        keyboardType: TextInputType.phone,
-        text: "13012345678"),
-    _Demo(
-        formatter: MaskedTextFormatter.complex(
-            formatStyle: "+86 *** **** ****", mark: "*"),
-        hint: "+86 130 1234 5678",
-        keyboardType: TextInputType.phone,
-        text: "13012345678"),
-    _Demo(
-        formatter: MaskedTextFormatter.mask(
-            formatStyle: "000 0000 0000", emptyPlaceholder: "_"),
-        hint: "130 1234 5678",
-        keyboardType: TextInputType.phone,
-        text: "13012345678"),
-    _Demo(
-        formatter: MaskedTextFormatter.custom(
-            formatStyle: "000 000 0000 0000 000X",
-            emptyPlaceholder: "_",
-            filterRules: {"X": RegExp(r'[0-9Xx]'), "0": RegExp(r'[0-9]')},
-            escapeMark: "\\"),
-        hint: "510 010 2020 0101 000X",
-        keyboardType: TextInputType.text,
-        text: "51001020200101000X"),
-  ];
+  List<_Demo> demos;
+
+  @override
+  void initState() {
+    super.initState();
+    demos = [
+      _Demo(
+          formatter: MaskedTextFormatter.simple("344"),
+          hint: "130 1234 5678",
+          keyboardType: TextInputType.phone,
+          text: "13012345678"),
+      _Demo(
+          formatter: MaskedTextFormatter.complex("😊😊😊****😊😊😊",
+              mark: "*", deleteEndPlaceholder: false),
+          hint: "😊😊😊----😊😊😊",
+          keyboardType: TextInputType.phone,
+          text: "12345"),
+      _Demo(
+          formatter:
+              MaskedTextFormatter.mask("000 0000 0000", emptyPlaceholder: "_"),
+          hint: "130 1234 5678",
+          keyboardType: TextInputType.phone,
+          text: "13012345678"),
+      _Demo(
+          formatter: MaskedTextFormatter.custom("000 000 0000 0000 000X",
+              emptyPlaceholder: "_",
+              filterRules: {
+                "X": RegExpMatcher.from(r'[0-9Xx]'),
+                "0": RegExpMatcher.from(r'[0-9]')
+              }),
+          hint: "510 010 2020 0101 000X",
+          keyboardType: TextInputType.text,
+          text: "51001020200101000X"),
+      _Demo(
+          formatter: MaskedTextFormatter.custom("2YYY/MM/DD",
+              emptyPlaceholder: "_",
+              filterRules: {
+                "Y": CustomDateMatcher("Y"),
+                "M": CustomDateMatcher("M"),
+                "D": CustomDateMatcher("D"),
+                "2": RegExpMatcher.from(r'[12]'),
+              },
+              escapeMark: "\\"),
+          hint: "请输入年月日，必须小于等于当前日期",
+          keyboardType: TextInputType.phone,
+          text: ""),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -153,5 +174,75 @@ class _MainPageState extends State<MainPage> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    this.demos?.clear();
+  }
+}
+
+class CustomDateMatcher extends Matcher {
+  static final sDate = DateTime.now();
+  static final sDateUtility = DateUtil();
+
+  final String mask;
+
+  CustomDateMatcher(this.mask);
+
+  @override
+  bool hasMatch(String previousText, String value) {
+    if (SpanText.isDigit(value)) {
+      if (mask == "Y") {
+        if (previousText.startsWith("1")) {
+          return true;
+        } else {
+          if (previousText.length == 1) {
+            return sDate.year >=
+                int.parse(previousText + value + "00", radix: 10);
+          } else if (previousText.length == 2) {
+            return sDate.year >=
+                int.parse(previousText + value + "0", radix: 10);
+          } else {
+            return sDate.year >= int.parse(previousText + value, radix: 10);
+          }
+        }
+      } else if (mask == "M") {
+        final year = int.parse(previousText.substring(0, 4), radix: 10);
+        var month;
+        if (previousText.length == 5) {
+          month = int.parse(value + "0", radix: 10);
+        } else {
+          month = int.parse(
+              previousText.substring(previousText.length - 1) + value,
+              radix: 10);
+        }
+        if (sDate.year == year) {
+          return sDate.month >= month;
+        } else {
+          return 12 >= month;
+        }
+      } else {
+        final year = int.parse(previousText.substring(0, 4), radix: 10);
+        final month = int.parse(previousText.substring(5, 7), radix: 10);
+        var day;
+        if (previousText.length == 8) {
+          day = int.parse(value + "0", radix: 10);
+        } else {
+          day = int.parse(
+              previousText.substring(previousText.length - 1) + value,
+              radix: 10);
+        }
+        if (sDate.year == year && sDate.month == month) {
+          return sDate.day >= day;
+        } else {
+          final days = sDateUtility.daysInMonth(month, year);
+          return days >= day;
+        }
+      }
+    } else {
+      return false;
+    }
   }
 }
